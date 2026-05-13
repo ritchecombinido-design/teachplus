@@ -1758,6 +1758,29 @@ async function exportToXLSX() {
   });
 
   // ─────────────────────────────
+// AUTO-HIDE EMPTY LEARNER ROWS
+// ─────────────────────────────
+
+// MALES (8–107)
+const maleStart = 8;
+const maleEnd = 107;
+const lastMaleRow = maleStart + d.males.length - 1;
+
+for (let r = lastMaleRow + 1; r <= maleEnd; r++) {
+  const row = ws.getRow(r);
+  row.hidden = true;
+}
+
+// FEMALES (109–208)
+const femaleStart = 109;
+const femaleEnd = 208;
+const lastFemaleRow = femaleStart + d.females.length - 1;
+
+for (let r = lastFemaleRow + 1; r <= femaleEnd; r++) {
+  const row = ws.getRow(r);
+  row.hidden = true;
+}
+  // ─────────────────────────────
   // EXPORT
   // ─────────────────────────────
   const out = await workbook.xlsx.writeBuffer();
