@@ -98,7 +98,7 @@ function toggleMobileSidebar(){
 }
 
 function goBackToDashboard() {
-  window.location.href = "dashboard.html";
+  window.location.href = "index.html";
 }
 // ====================================================
 //  CLOCK
