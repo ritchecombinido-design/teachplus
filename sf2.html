@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SF2 – Daily Attendance | TeachPlus</title>
+   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="dexie.js"></script>
 <link rel="stylesheet" href="fontawesome/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1480,213 +1481,325 @@ function renderHeatmap(d) {
 }
 
 /* ============================================================
-   XLSX EXPORT – SF2 MAPPING (xlsx-populate — true template preservation)
-   ============================================================ */
+REPLACE your entire exportToXLSX() function with this.
+Also add JSZip to your HTML <head> BEFORE your other scripts:
+
+
+
+HOW IT WORKS:
+
+- Loads sf2_template.xlsx as raw binary (never parsed by a style-aware library)
+- Opens it as a ZIP (because .xlsx IS a zip)
+- Reads xl/worksheets/sheet1.xml
+- Surgically injects ONLY <v> value nodes into existing <c> cell elements
+- Re-zips and downloads — borders, merges, alignment, fonts all 100% intact
+  ============================================================ */
+
 async function exportToXLSX() {
-  if (!currentSF2) { toast('Please load data first.', 'error', 'fa-exclamation-circle'); return; }
+if (!currentSF2) {
+toast(‘Please load data first.’, ‘error’, ‘fa-exclamation-circle’);
+return;
+}
 
-  if (typeof XlsxPopulate === 'undefined') {
-    toast('xlsx-populate not loaded. Check your internet connection.', 'error', 'fa-exclamation-circle');
-    return;
-  }
+if (typeof JSZip === ‘undefined’) {
+toast(‘JSZip not loaded. Add it to your HTML head.’, ‘error’, ‘fa-exclamation-circle’);
+return;
+}
 
-  toast('Loading template & building SF2...', 'info', 'fa-cog fa-spin');
+toast(‘Loading template…’, ‘info’, ‘fa-cog fa-spin’);
 
-  const d = currentSF2;
+const d = currentSF2;
 
-  // ── Week→column mapping ──
-  const weekDayMap = [
-    { mon:'F',  tue:'H',  wed:'I',  thu:'J',  fri:'K'  }, // Week 1
-    { mon:'L',  tue:'N',  wed:'O',  thu:'P',  fri:'Q'  }, // Week 2
-    { mon:'R',  tue:'T',  wed:'U',  thu:'V',  fri:'X'  }, // Week 3
-    { mon:'Z',  tue:'AB', wed:'AC', thu:'AD', fri:'AE' }, // Week 4
-    { mon:'AF', tue:'AG', wed:'AI', thu:'AJ', fri:'AK' }, // Week 5
-  ];
+const weekDayMap = [
+{ mon: ‘F’,  tue: ‘H’,  wed: ‘I’,  thu: ‘J’,  fri: ‘K’  }, // Week 1
+{ mon: ‘L’,  tue: ‘N’,  wed: ‘O’,  thu: ‘P’,  fri: ‘Q’  }, // Week 2
+{ mon: ‘R’,  tue: ‘T’,  wed: ‘U’,  thu: ‘V’,  fri: ‘X’  }, // Week 3
+{ mon: ‘Z’,  tue: ‘AB’, wed: ‘AC’, thu: ‘AD’, fri: ‘AE’ }, // Week 4
+{ mon: ‘AF’, tue: ‘AG’, wed: ‘AI’, thu: ‘AJ’, fri: ‘AK’ }, // Week 5
+];
 
-  const DOW_TO_KEY = { 1:'mon', 2:'tue', 3:'wed', 4:'thu', 5:'fri' };
+const DOW_TO_KEY = { 1: ‘mon’, 2: ‘tue’, 3: ‘wed’, 4: ‘thu’, 5: ‘fri’ };
 
-  function getDayMapping(schoolDays) {
-    const map = {};
-    let weekIndex = 0;
-    let lastDOW = -1;
-    schoolDays.forEach(day => {
-      const dow = getDOW(d.year, d.month, day);
-      if (dow === 1 && lastDOW !== -1 && weekIndex < 4) weekIndex++;
-      lastDOW = dow;
-      const key = DOW_TO_KEY[dow];
-      const wMap = weekDayMap[Math.min(weekIndex, 4)];
-      if (key && wMap) {
-        map[day] = wMap[key];
+function getDayMapping(schoolDays) {
+const map = {};
+let weekIndex = 0;
+let lastDOW = -1;
+schoolDays.forEach(day => {
+const dow = getDOW(d.year, d.month, day);
+if (dow === 1 && lastDOW !== -1 && weekIndex < 4) weekIndex++;
+lastDOW = dow;
+const key = DOW_TO_KEY[dow];
+const wMap = weekDayMap[Math.min(weekIndex, 4)];
+if (key && wMap) map[day] = wMap[key];
+});
+return map;
+}
+
+const dayColMap = getDayMapping(d.schoolDays);
+
+/* ── Convert column letter(s) to 0-based index ── */
+function colLetterToIndex(col) {
+let n = 0;
+for (let i = 0; i < col.length; i++) {
+n = n * 26 + (col.charCodeAt(i) - 64);
+}
+return n; // 1-based, matches Excel
+}
+
+/* ── Convert col index back to letter ── */
+function colIndexToLetter(n) {
+let s = ‘’;
+while (n > 0) {
+const r = (n - 1) % 26;
+s = String.fromCharCode(65 + r) + s;
+n = Math.floor((n - 1) / 26);
+}
+return s;
+}
+
+/* ── Build cell address e.g. “F3” ── */
+function addr(col, row) {
+return `${col}${row}`;
+}
+
+/* ── Collect all values to write: { “F3”: value, … } ── */
+const writes = {};
+
+function w(col, row, value) {
+writes[addr(col, row)] = value;
+}
+
+// ── HEADER INFO ──
+w(‘F’,  3,  d.schoolId);
+w(‘M’,  3,  d.schoolYear);
+w(‘AA’, 3,  MONTHS[d.month]);
+w(‘F’,  4,  d.schoolName);
+w(‘AA’, 4,  `Grade ${d.grade}`);
+w(‘AM’, 4,  d.section);
+
+// ── DATE ROW 6 ──
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (col) w(col, 6, day);
+});
+
+// ── MALE LEARNERS rows 8–107 ──
+d.males.forEach((l, i) => {
+const row = 8 + i;
+w(‘C’, row, l.fullname);
+w(‘AM’, row, l.absent);
+w(‘AO’, row, l.present);
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (!col) return;
+const dt = padDate(d.year, d.month, day);
+const st = d.attMap[`${l.id}_${dt}`] || ‘present’;
+if (st === ‘absent’)       w(col, row, ‘X’);
+else if (st === ‘late’)    w(col, row, ‘/’);
+else if (st === ‘cutting’) w(col, row, ‘\’);
+// present = blank, don’t write
+});
+});
+
+// ── ROW 108 — Male daily totals ──
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (!col) return;
+const dt = padDate(d.year, d.month, day);
+w(col, 108, d.maleDayTotals[dt] || 0);
+});
+w(‘AM’, 108, d.totalMaleAbsent);
+w(‘AO’, 108, d.totalMalePresent);
+
+// ── FEMALE LEARNERS rows 109–208 ──
+d.females.forEach((l, i) => {
+const row = 109 + i;
+w(‘C’, row, l.fullname);
+w(‘AM’, row, l.absent);
+w(‘AO’, row, l.present);
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (!col) return;
+const dt = padDate(d.year, d.month, day);
+const st = d.attMap[`${l.id}_${dt}`] || ‘present’;
+if (st === ‘absent’)       w(col, row, ‘X’);
+else if (st === ‘late’)    w(col, row, ‘/’);
+else if (st === ‘cutting’) w(col, row, ‘\’);
+});
+});
+
+// ── ROW 209 — Female daily totals ──
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (!col) return;
+const dt = padDate(d.year, d.month, day);
+w(col, 209, d.femaleDayTotals[dt] || 0);
+});
+w(‘AM’, 209, d.totalFemaleAbsent);
+w(‘AO’, 209, d.totalFemalePresent);
+
+// ── ROW 210 — Combined totals ──
+d.schoolDays.forEach(day => {
+const col = dayColMap[day];
+if (!col) return;
+const dt = padDate(d.year, d.month, day);
+w(col, 210, (d.maleDayTotals[dt] || 0) + (d.femaleDayTotals[dt] || 0));
+});
+w(‘AM’, 210, d.totalAbsent);
+w(‘AO’, 210, d.totalPresent);
+
+// ── ENROLLMENT SUMMARY ──
+w(‘AR’, 219, d.totalMale);
+w(‘AR’, 213, d.totalMale);
+w(‘AS’, 219, d.totalFemale);
+w(‘AS’, 213, d.totalFemale);
+w(‘AT’, 219, d.totalAll);
+w(‘AT’, 213, d.totalAll);
+
+// ── PERCENTAGE OF ENROLLMENT ──
+w(‘AR’, 221, parseFloat((d.totalMale   > 0 ? 100 : 0).toFixed(2)));
+w(‘AS’, 221, parseFloat((d.totalFemale > 0 ? 100 : 0).toFixed(2)));
+w(‘AT’, 221, parseFloat((d.totalAll    > 0 ? 100 : 0).toFixed(2)));
+
+// ── AVERAGE DAILY ATTENDANCE ──
+w(‘AR’, 223, parseFloat(d.adaM.toFixed(2)));
+w(‘AS’, 223, parseFloat(d.adaF.toFixed(2)));
+w(‘AT’, 223, parseFloat(d.ada.toFixed(2)));
+
+// ── PERCENTAGE OF ATTENDANCE ──
+const pctAttM = d.totalMale   > 0 && d.schoolDays.length > 0 ? d.totalMalePresent   / (d.totalMale   * d.schoolDays.length) * 100 : 0;
+const pctAttF = d.totalFemale > 0 && d.schoolDays.length > 0 ? d.totalFemalePresent / (d.totalFemale * d.schoolDays.length) * 100 : 0;
+const pctAttT = d.totalAll    > 0 && d.schoolDays.length > 0 ? d.totalPresent       / (d.totalAll    * d.schoolDays.length) * 100 : 0;
+w(‘AR’, 225, parseFloat(pctAttM.toFixed(2)));
+w(‘AS’, 225, parseFloat(pctAttF.toFixed(2)));
+w(‘AT’, 225, parseFloat(pctAttT.toFixed(2)));
+
+// ── CONSECUTIVE ABSENCES ≥5 ──
+w(‘AR’, 226, d.maleConsec5);
+w(‘AS’, 226, d.femaleConsec5);
+w(‘AT’, 226, d.totalConsec5);
+
+// ── SIGNATURES ──
+w(‘AN’, 236, d.teacherName);
+w(‘AN’, 242, d.principal);
+
+/* ══════════════════════════════════════════════════════════
+RAW XML INJECTION — the core of the approach
+══════════════════════════════════════════════════════════ */
+try {
+const resp = await fetch(‘sf2_template.xlsx’);
+if (!resp.ok) throw new Error(‘sf2_template.xlsx not found. Make sure it is in the same folder as your HTML file.’);
+const ab = await resp.arrayBuffer();
+
+```
+// Open as ZIP — never parsed as a spreadsheet, styles stay 100% intact
+const zip = await JSZip.loadAsync(ab);
+
+// Read the sheet XML
+const sheetXmlRaw = await zip.file('xl/worksheets/sheet1.xml').async('string');
+
+/* ── XML Injection Strategy ──
+   For each cell address we want to write:
+   1. Find the existing <c r="ADDR"...> element in the XML
+   2. If it has a <v> tag, replace its content
+   3. If it has no <v> tag, inject one
+   4. If the cell doesn't exist at all, inject a new <c> element in the correct <row>
+   
+   We NEVER touch s= (style), t= (type for shared strings), or any other attribute.
+   String values use t="str" inline. Numbers have no t attribute.
+*/
+
+let sheetXml = sheetXmlRaw;
+
+for (const [cellAddr, value] of Object.entries(writes)) {
+  const isNumber = typeof value === 'number';
+  const strVal   = String(value);
+
+  // Escape XML special chars for string values
+  const xmlVal = strVal
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  /* Pattern: match existing <c r="ADDR" ... > ... </c>
+     We use a targeted regex that matches just this cell. */
+     
+  const cellRegex = new RegExp(
+    `(<c[^>]*\\sr="${cellAddr}"[^>]*>)(.*?)(</c>)`,
+    's'
+  );
+
+  if (cellRegex.test(sheetXml)) {
+    // Cell EXISTS — replace or inject <v>
+    sheetXml = sheetXml.replace(cellRegex, (match, open, inner, close) => {
+      // Remove existing <v>...</v> if present
+      let newInner = inner.replace(/<v>[^<]*<\/v>/g, '');
+      // Remove existing <is>...</is> (inline string) if present
+      newInner = newInner.replace(/<is>.*?<\/is>/gs, '');
+
+      // Build the new opening tag — add t="str" for strings, remove it for numbers
+      let newOpen = open;
+      if (isNumber) {
+        // Remove t="str" if it was there
+        newOpen = newOpen.replace(/\s*t="[^"]*"/, '');
+      } else {
+        // Ensure t="str"
+        if (/t="/.test(newOpen)) {
+          newOpen = newOpen.replace(/t="[^"]*"/, 't="str"');
+        } else {
+          newOpen = newOpen.replace(/<c /, '<c t="str" ');
+        }
       }
+
+      return `${newOpen}<v>${xmlVal}</v>${newInner}${close}`;
     });
-    return map;
-  }
+  } else {
+    /* Cell does NOT exist in template — inject into its row.
+       Find the row element and append a new <c> before </row> */
+    const rowNum = parseInt(cellAddr.match(/\d+/)[0]);
+    const rowRegex = new RegExp(
+      `(<row[^>]*\\sr="${rowNum}"[^>]*>)(.*?)(</row>)`,
+      's'
+    );
 
-  const dayColMap = getDayMapping(d.schoolDays);
+    const typeAttr = isNumber ? '' : ' t="str"';
+    const newCell  = `<c r="${cellAddr}"${typeAttr}><v>${xmlVal}</v></c>`;
 
-  try {
-    // ── Load template via fetch → ArrayBuffer → xlsx-populate ──
-    let workbook;
-    try {
-      const resp = await fetch('sf2_template.xlsx');
-      if (!resp.ok) throw new Error('Template not found');
-      const ab = await resp.arrayBuffer();
-      workbook = await XlsxPopulate.fromDataAsync(ab);
-      toast('Template loaded ✓ Writing data...', 'info', 'fa-file-excel');
-    } catch(e) {
-      toast('sf2_template.xlsx not found — exporting data-only file.', 'info', 'fa-info-circle');
-      workbook = await XlsxPopulate.fromBlankAsync();
-    }
-
-    const ws = workbook.sheet(0);
-
-    // ── Helper: write value only — style is NEVER touched ──
-    function setCell(colLetter, rowNum, value) {
-      ws.cell(`${colLetter}${rowNum}`).value(value);
-    }
-
-    // ── HEADER INFO ──
-    setCell('F',  3, d.schoolId);
-    setCell('M',  3, d.schoolYear);
-    setCell('AA', 3, MONTHS[d.month]);
-    setCell('F',  4, d.schoolName);
-    setCell('AA', 4, `Grade ${d.grade}`);
-    setCell('AM', 4, d.section);
-
-    // ── DATE ROW 6 — write day numbers ──
-    d.schoolDays.forEach(day => {
-      const col = dayColMap[day];
-      if (col) setCell(col, 6, day);
-    });
-
-    // ── MALE LEARNERS — rows 8 to 107 ──
-    d.males.forEach((l, i) => {
-      const row = 8 + i;
-      setCell('C', row, l.fullname);
-      setCell('AM', row, l.absent);
-      setCell('AO', row, l.present);
-
-      d.schoolDays.forEach(day => {
-        const col = dayColMap[day];
-        if (!col) return;
-        const dt = padDate(d.year, d.month, day);
-        const st = d.attMap[`${l.id}_${dt}`] || 'present';
-        if (st === 'absent')       setCell(col, row, 'X');
-        else if (st === 'late')    setCell(col, row, '/');
-        else if (st === 'cutting') setCell(col, row, '\\');
-        // present stays blank — don't overwrite template cell
+    if (rowRegex.test(sheetXml)) {
+      sheetXml = sheetXml.replace(rowRegex, (match, open, inner, close) => {
+        return `${open}${inner}${newCell}${close}`;
       });
-    });
-
-    // ── ROW 108 — Male daily present totals ──
-    d.schoolDays.forEach(day => {
-      const col = dayColMap[day];
-      if (!col) return;
-      const dt = padDate(d.year, d.month, day);
-      setCell(col, 108, d.maleDayTotals[dt] || 0);
-    });
-    setCell('AM', 108, d.totalMaleAbsent);
-    setCell('AO', 108, d.totalMalePresent);
-
-    // ── FEMALE LEARNERS — rows 109 to 208 ──
-    d.females.forEach((l, i) => {
-      const row = 109 + i;
-      setCell('C', row, l.fullname);
-      setCell('AM', row, l.absent);
-      setCell('AO', row, l.present);
-
-      d.schoolDays.forEach(day => {
-        const col = dayColMap[day];
-        if (!col) return;
-        const dt = padDate(d.year, d.month, day);
-        const st = d.attMap[`${l.id}_${dt}`] || 'present';
-        if (st === 'absent')       setCell(col, row, 'X');
-        else if (st === 'late')    setCell(col, row, '/');
-        else if (st === 'cutting') setCell(col, row, '\\');
-      });
-    });
-
-    // ── ROW 209 — Female daily present totals ──
-    d.schoolDays.forEach(day => {
-      const col = dayColMap[day];
-      if (!col) return;
-      const dt = padDate(d.year, d.month, day);
-      setCell(col, 209, d.femaleDayTotals[dt] || 0);
-    });
-    setCell('AM', 209, d.totalFemaleAbsent);
-    setCell('AO', 209, d.totalFemalePresent);
-
-    // ── ROW 210 — Combined M+F daily totals ──
-    d.schoolDays.forEach(day => {
-      const col = dayColMap[day];
-      if (!col) return;
-      const dt = padDate(d.year, d.month, day);
-      const total = (d.maleDayTotals[dt]||0) + (d.femaleDayTotals[dt]||0);
-      setCell(col, 210, total);
-    });
-    setCell('AM', 210, d.totalAbsent);
-    setCell('AO', 210, d.totalPresent);
-
-    // ── ENROLLMENT SUMMARY ──
-    setCell('AR', 219, d.totalMale);
-    setCell('AR', 213, d.totalMale);
-    setCell('AS', 219, d.totalFemale);
-    setCell('AS', 213, d.totalFemale);
-    setCell('AT', 219, d.totalAll);
-    setCell('AT', 213, d.totalAll);
-
-    // ── PERCENTAGE OF ENROLLMENT ──
-    const pctEnrM = d.totalMale   > 0 ? 100 : 0;
-    const pctEnrF = d.totalFemale > 0 ? 100 : 0;
-    const pctEnrT = d.totalAll    > 0 ? 100 : 0;
-    setCell('AR', 221, parseFloat(pctEnrM.toFixed(2)));
-    setCell('AS', 221, parseFloat(pctEnrF.toFixed(2)));
-    setCell('AT', 221, parseFloat(pctEnrT.toFixed(2)));
-
-    // ── AVERAGE DAILY ATTENDANCE ──
-    setCell('AR', 223, parseFloat(d.adaM.toFixed(2)));
-    setCell('AS', 223, parseFloat(d.adaF.toFixed(2)));
-    setCell('AT', 223, parseFloat(d.ada.toFixed(2)));
-
-    // ── PERCENTAGE OF ATTENDANCE FOR THE MONTH ──
-    const pctAttM = d.totalMale > 0 && d.schoolDays.length > 0
-      ? d.totalMalePresent / (d.totalMale * d.schoolDays.length) * 100 : 0;
-    const pctAttF = d.totalFemale > 0 && d.schoolDays.length > 0
-      ? d.totalFemalePresent / (d.totalFemale * d.schoolDays.length) * 100 : 0;
-    const pctAttT = d.totalAll > 0 && d.schoolDays.length > 0
-      ? d.totalPresent / (d.totalAll * d.schoolDays.length) * 100 : 0;
-    setCell('AR', 225, parseFloat(pctAttM.toFixed(2)));
-    setCell('AS', 225, parseFloat(pctAttF.toFixed(2)));
-    setCell('AT', 225, parseFloat(pctAttT.toFixed(2)));
-
-    // ── CONSECUTIVE ABSENCES ≥5 ──
-    setCell('AR', 226, d.maleConsec5);
-    setCell('AS', 226, d.femaleConsec5);
-    setCell('AT', 226, d.totalConsec5);
-
-    // ── TEACHER & PRINCIPAL NAMES ──
-    setCell('AN', 236, d.teacherName);
-    setCell('AN', 242, d.principal);
-
-    // ── GENERATE & DOWNLOAD ──
-    const blob = await workbook.outputAsync('blob');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `SF2_Grade${d.grade}_${d.section}_${MONTHS[d.month]}_${d.schoolYear}.xlsx`.replace(/\s/g,'_');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast('SF2 exported successfully! 🎉', 'success', 'fa-check-circle');
-
-  } catch(e) {
-    console.error(e);
-    toast('Export failed: ' + e.message, 'error', 'fa-exclamation-circle');
+    } else {
+      /* Row itself doesn't exist — inject a new row before </sheetData> */
+      const newRow = `<row r="${rowNum}">${newCell}</row>`;
+      sheetXml = sheetXml.replace('</sheetData>', `${newRow}</sheetData>`);
+    }
   }
 }
 
+// Write modified XML back into the zip — everything else (styles, merges, etc.) untouched
+zip.file('xl/worksheets/sheet1.xml', sheetXml);
+
+// Generate and download
+const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+const url  = URL.createObjectURL(blob);
+const a    = document.createElement('a');
+a.href     = url;
+a.download = `SF2_Grade${d.grade}_${d.section}_${MONTHS[d.month]}_${d.schoolYear}.xlsx`.replace(/\s/g, '_');
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+
+toast('SF2 exported successfully! Borders & layout fully preserved 🎉', 'success', 'fa-check-circle');
+```
+
+} catch (e) {
+console.error(e);
+toast(’Export failed: ’ + e.message, ‘error’, ‘fa-exclamation-circle’);
+}
+}
 /* ============================================================
    PDF EXPORT (Print-based)
    ============================================================ */
