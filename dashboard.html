@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a5276">
+<meta name="description" content="TeachPlus - Modern Teacher Assistant Dashboard">
+<title>TeachPlus – Teacher Dashboard</title>
+
+<!-- LOCAL DEPENDENCIES (place these in same folder) -->
+
+<script src="dexie.js"></script>
+
+<link rel="stylesheet" href="all.min.css">
+
+<!-- Google Fonts - Sora + DM Serif Display -->
+
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+
+<!-- ============================================================
+     SIDEBAR OVERLAY
+     ============================================================ -->
+
+<!-- ============================================================
+     THEME BACKGROUND LAYER
+     ============================================================ -->
+
+<div id="themeBackground" aria-hidden="true">
+  <div class="bg-icon bg-xl bg-top-left"><i class=""></i></div>
+  <div class="bg-icon bg-sm bg-top-right"><i class=""></i></div>
+  <div class="bg-icon bg-sm bg-bottom-left"><i class=""></i></div>
+  <div class="bg-icon bg-xl bg-bottom-right"><i class=""></i></div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ============================================================
+     SIDEBAR
+     ============================================================ -->
+
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="fas fa-chalkboard-teacher" aria-hidden="true"></i></div>
+    <div class="brand-name">Teach<span>Plus</span></div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+
+```
+<button class="nav-item active" onclick="navigate('dashboard')" aria-label="Dashboard">
+  <i class="fas fa-th-large" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Dashboard
+</button>
+
+<div class="nav-section-label">Bundles</div>
+
+<button class="nav-item" onclick="navigate('teaching')" aria-label="Teaching & Class Management">
+  <i class="fas fa-book-open" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Teaching & Classes
+</button>
+
+<button class="nav-item" onclick="navigate('forms')" aria-label="School Forms & Reports">
+  <i class="fas fa-file-alt" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Forms & Reports
+</button>
+
+<button class="nav-item" onclick="navigate('admin')" aria-label="Administration & Planning">
+  <i class="fas fa-sitemap" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Administration
+</button>
+
+<button class="nav-item" onclick="navigate('engagement')" aria-label="Classroom Engagement">
+  <i class="fas fa-star" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Engagement
+</button>
+
+<div class="nav-section-label">Tools</div>
+
+<button class="nav-item" onclick="showToast('Calendar coming soon!','fas fa-calendar-alt')" aria-label="Calendar">
+  <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Calendar
+</button>
+
+<button class="nav-item" onclick="showToast('Task manager coming soon!','fas fa-tasks')" aria-label="Tasks">
+  <i class="fas fa-tasks" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Task Manager
+</button>
+
+<button class="nav-item" onclick="navigate('settings')" aria-label="Settings">
+  <i class="fas fa-cog" aria-hidden="true"></i>
+  <div class="nav-theme-icon" aria-hidden="true"><i class=""></i></div>
+  Settings
+</button>
+```
+
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="nav-item" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle dark mode">
+      <i class="fas fa-moon" id="themeIcon" aria-hidden="true"></i>
+      <span id="themeLabel">Dark Mode</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ============================================================
+     MAIN CONTENT
+     ============================================================ -->
+
+<div class="main-content">
+
+  <!-- TOPBAR -->
+
+  <header class="topbar" role="banner">
+    <div class="topbar-left">
+      <button class="menu-toggle" id="menuToggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+      <span class="topbar-title" id="topbarTitle">Dashboard</span>
+      <span class="topbar-datetime" id="topbarDatetime" aria-live="polite">
+        <i class="fas fa-clock" aria-hidden="true"></i>
+        <span id="clockText">--:--</span>
+      </span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" onclick="showView('settings')" aria-label="Notifications">
+        <i class="fas fa-bell" aria-hidden="true"></i>
+        <span class="notif-dot" aria-hidden="true"></span>
+      </button>
+      <div class="avatar" id="avatarBtn" onclick="showView('settings')" role="button" tabindex="0" aria-label="Profile settings">T</div>
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+
+  <main class="page-content" id="pageContent" role="main">
+
+```
+<!-- ============================
+     VIEW: DASHBOARD
+     ============================ -->
+<section class="view active" id="view-dashboard" aria-label="Dashboard">
+
+  <!-- Welcome Banner -->
+  <div class="welcome-banner">
+    <div class="welcome-greeting" id="welcomeGreeting">Mabuhay, Teacher!</div>
+    <div class="welcome-sub">Your teaching workspace is ready for today.</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid" role="list" aria-label="Quick statistics">
+    <div class="stat-card" role="listitem">
+      <div class="stat-theme-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="stat-icon blue" aria-hidden="true"><i class="fas fa-users-class"></i></div>
+      <div>
+        <div class="stat-val" id="statClasses">4</div>
+        <div class="stat-label">Classes Today</div>
+      </div>
+    </div>
+    <div class="stat-card" role="listitem">
+      <div class="stat-theme-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="stat-icon amber" aria-hidden="true"><i class="fas fa-clipboard-list"></i></div>
+      <div>
+        <div class="stat-val" id="statTasks">7</div>
+        <div class="stat-label">Pending Tasks</div>
+      </div>
+    </div>
+    <div class="stat-card" role="listitem">
+      <div class="stat-theme-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="stat-icon rose" aria-hidden="true" style="background:rgba(225,29,72,.12);color:var(--rose)"><i class="fas fa-file-invoice"></i></div>
+      <div>
+        <div class="stat-val" id="statReports">2</div>
+        <div class="stat-label">Reports Due</div>
+      </div>
+    </div>
+    <div class="stat-card" role="listitem">
+      <div class="stat-theme-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="stat-icon green" aria-hidden="true"><i class="fas fa-user-check"></i></div>
+      <div>
+        <div class="stat-val" id="statAttendance">96%</div>
+        <div class="stat-label">Attendance Today</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Announcement -->
+  <div class="announcement-card" role="alert" aria-label="Announcement">
+    <i class="fas fa-bullhorn" aria-hidden="true"></i>
+    <div>
+      <div style="font-weight:600;font-size:.88rem;margin-bottom:3px;">School Reminder</div>
+      <div style="font-size:.8rem;color:var(--text2);">Quarterly report cards are due by end of week. Complete all SF9 entries in the Forms & Reports section.</div>
+    </div>
+  </div>
+
+  <!-- Bundle Navigation Cards -->
+  <div class="section-heading">
+    <i class="fas fa-th-large" aria-hidden="true"></i> Your Bundles
+  </div>
+  <div class="bundles-grid" role="list" aria-label="Feature bundles">
+
+    <div class="bundle-card" onclick="showView('teaching')" role="listitem" tabindex="0" aria-label="Teaching and Class Management"
+      style="--bcolor:#2563eb;--bicon-bg:rgba(37,99,235,.1)">
+      <div class="theme-corner-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="theme-fill-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="bundle-header">
+        <div class="bundle-icon" aria-hidden="true"><i class="fas fa-book-open"></i></div>
+        <div>
+          <div class="bundle-title">Teaching &amp; Class Management</div>
+          <div class="bundle-sub">Core daily teaching workflow</div>
+        </div>
+      </div>
+      <div class="bundle-tools">
+        <span class="tool-tag">Attendance</span>
+        <span class="tool-tag">Assessment</span>
+        <span class="tool-tag">Grading</span>
+        <span class="tool-tag">Seating</span>
+        <span class="tool-tag">Lesson Notes</span>
+        <span class="tool-tag">Score Encoding</span>
+      </div>
+    </div>
+
+    <div class="bundle-card" onclick="showView('forms')" role="listitem" tabindex="0" aria-label="School Forms and Reports"
+      style="--bcolor:#0d9488;--bicon-bg:rgba(13,148,136,.1)">
+      <div class="theme-corner-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="theme-fill-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="bundle-header">
+        <div class="bundle-icon" aria-hidden="true"><i class="fas fa-file-alt"></i></div>
+        <div>
+          <div class="bundle-title">School Forms &amp; Reports</div>
+          <div class="bundle-sub">Official outputs and compliance</div>
+        </div>
+      </div>
+      <div class="bundle-tools">
+        <span class="tool-tag">SF1</span>
+        <span class="tool-tag">SF2</span>
+        <span class="tool-tag">SF9</span>
+        <span class="tool-tag">Masterlist</span>
+        <span class="tool-tag">Grade Export</span>
+        <span class="tool-tag">Transmutation</span>
+      </div>
+    </div>
+
+    <div class="bundle-card" onclick="showView('admin')" role="listitem" tabindex="0" aria-label="Administration and Planning"
+      style="--bcolor:#7c3aed;--bicon-bg:rgba(124,58,237,.1)">
+      <div class="theme-corner-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="theme-fill-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="bundle-header">
+        <div class="bundle-icon" aria-hidden="true"><i class="fas fa-sitemap"></i></div>
+        <div>
+          <div class="bundle-title">Administration &amp; Planning</div>
+          <div class="bundle-sub">School operations and organization</div>
+        </div>
+      </div>
+      <div class="bundle-tools">
+        <span class="tool-tag">Scheduling</span>
+        <span class="tool-tag">Time Tracking</span>
+        <span class="tool-tag">Leave Planner</span>
+        <span class="tool-tag">IPCRF</span>
+        <span class="tool-tag">Meeting Logs</span>
+        <span class="tool-tag">Task Mgmt</span>
+      </div>
+    </div>
+
+    <div class="bundle-card" onclick="showView('engagement')" role="listitem" tabindex="0" aria-label="Classroom Engagement"
+      style="--bcolor:#d97706;--bicon-bg:rgba(217,119,6,.1)">
+      <div class="theme-corner-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="theme-fill-icon" aria-hidden="true"><i class=""></i></div>
+      <div class="bundle-header">
+        <div class="bundle-icon" aria-hidden="true"><i class="fas fa-star"></i></div>
+        <div>
+          <div class="bundle-title">Classroom Engagement</div>
+          <div class="bundle-sub">Interactive teaching tools</div>
+        </div>
+      </div>
+      <div class="bundle-tools">
+        <span class="tool-tag">Name Picker</span>
+        <span class="tool-tag">Quiz Games</span>
+        <span class="tool-tag">Rewards</span>
+        <span class="tool-tag">Timer</span>
+        <span class="tool-tag">Wheel Spinner</span>
+        <span class="tool-tag">Flashcards</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Row 2: Quote + Activity + Calendar -->
+  <div class="section-heading">
+    <i class="fas fa-columns" aria-hidden="true"></i> Daily Overview
+  </div>
+  <div class="dashboard-row">
+
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <!-- Quote Card -->
+      <div class="quote-card" aria-label="Daily inspiration">
+        <div>
+          <span class="quote-badge" aria-hidden="true">
+            <i class="fas fa-sun"></i> Daily Inspiration
+          </span>
+        </div>
+        <blockquote class="quote-text" id="quoteText" aria-live="polite">
+          "Teaching is the greatest act of optimism."
+        </blockquote>
+        <div class="quote-author" id="quoteAuthor">— Colleen Wilcox</div>
+        <div>
+          <button class="btn btn-primary" onclick="nextQuote()" aria-label="Get new quote">
+            <i class="fas fa-sync-alt" aria-hidden="true"></i> Inspire Me Again
+          </button>
+        </div>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="activity-feed" aria-label="Recent activity">
+        <div class="section-heading" style="margin-bottom:0">
+          <i class="fas fa-history" aria-hidden="true"></i> Recent Activity
+        </div>
+        <div class="activity-list" id="activityList" aria-live="polite" role="log">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <!-- Mini Calendar -->
+      <div class="mini-calendar" aria-label="Mini calendar">
+        <div class="cal-header">
+          <span class="cal-month" id="calMonthLabel" aria-live="polite"></span>
+          <div class="cal-nav">
+            <button onclick="changeCalMonth(-1)" aria-label="Previous month"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+            <button onclick="changeCalMonth(1)"  aria-label="Next month"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="cal-grid" id="calGrid" role="grid" aria-label="Calendar grid"></div>
+      </div>
+
+      <!-- Schedule Panel -->
+      <div class="schedule-panel" aria-label="Today's schedule">
+        <div class="section-heading" style="margin-bottom:12px">
+          <i class="fas fa-clock" aria-hidden="true"></i> Today's Schedule
+        </div>
+        <div class="schedule-item">
+          <div class="sched-dot" style="background:var(--accent)"></div>
+          <div class="sched-time">7:30 AM</div>
+          <div><div class="sched-title">Flag Ceremony</div><div class="sched-sub">School Quadrangle</div></div>
+        </div>
+        <div class="schedule-item">
+          <div class="sched-dot" style="background:var(--green)"></div>
+          <div class="sched-time">8:00 AM</div>
+          <div><div class="sched-title">Grade 7 – Math</div><div class="sched-sub">Room 101</div></div>
+        </div>
+        <div class="schedule-item">
+          <div class="sched-dot" style="background:var(--purple)"></div>
+          <div class="sched-time">10:00 AM</div>
+          <div><div class="sched-title">Grade 8 – Science</div><div class="sched-sub">Laboratory</div></div>
+        </div>
+        <div class="schedule-item">
+          <div class="sched-dot" style="background:var(--amber)"></div>
+          <div class="sched-time">1:00 PM</div>
+          <div><div class="sched-title">Department Meeting</div><div class="sched-sub">Faculty Room</div></div>
+        </div>
+        <div class="schedule-item">
+          <div class="sched-dot" style="background:var(--rose)"></div>
+          <div class="sched-time">3:00 PM</div>
+          <div><div class="sched-title">Grade 9 – Filipino</div><div class="sched-sub">Room 203</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</section><!-- /dashboard -->
+
+<!-- ============================
+     VIEW: TEACHING
+     ============================ -->
+<section class="view" id="view-teaching" aria-label="Teaching and Class Management">
+  <div class="page-header">
+    <h2><i class="fas fa-book-open" style="color:var(--accent)"></i> Teaching &amp; Class Management</h2>
+    <p>Core daily teaching workflow — attendance, grading, lesson notes, and more.</p>
+  </div>
+  <div class="tool-grid" role="list">
+    <!-- tools populated by JS -->
+  </div>
+</section>
+
+<!-- ============================
+     VIEW: FORMS
+     ============================ -->
+<section class="view" id="view-forms" aria-label="School Forms and Reports">
+  <div class="page-header">
+    <h2><i class="fas fa-file-alt" style="color:var(--green)"></i> School Forms &amp; Reports</h2>
+    <p>Official forms, compliance documents, and grade exporters.</p>
+  </div>
+  <div class="tool-grid" role="list"></div>
+</section>
+
+<!-- ============================
+     VIEW: ADMIN
+     ============================ -->
+<section class="view" id="view-admin" aria-label="Administration and Planning">
+  <div class="page-header">
+    <h2><i class="fas fa-sitemap" style="color:var(--purple)"></i> Administration &amp; Planning</h2>
+    <p>School operations, scheduling, IPCRF, and personnel records.</p>
+  </div>
+  <div class="tool-grid" role="list"></div>
+</section>
+
+<!-- ============================
+     VIEW: ENGAGEMENT
+     ============================ -->
+<section class="view" id="view-engagement" aria-label="Classroom Engagement">
+  <div class="page-header">
+    <h2><i class="fas fa-star" style="color:var(--amber)"></i> Classroom Engagement</h2>
+    <p>Interactive games, rewards, timers, and student activities.</p>
+  </div>
+  <div class="tool-grid" role="list"></div>
+</section>
+
+<!-- ============================
+     VIEW: SETTINGS
+     ============================ -->
+<section class="view" id="view-settings" aria-label="Settings">
+  <div class="page-header">
+    <h2><i class="fas fa-cog" style="color:var(--accent)"></i> Settings &amp; Profile</h2>
+    <p>Personalize your TeachPlus experience.</p>
+  </div>
+
+  <!-- Nickname -->
+<!-- Teacher Profile -->
+<div class="nickname-card" style="align-items:flex-start;">
+
+  <div class="stat-icon blue" aria-hidden="true">
+    <i class="fas fa-user-tie"></i>
+  </div>
+
+  <div class="nickname-info" style="width:100%;">
+
+    <div class="nickname-label">
+      Teacher Profile
+    </div>
+
+    <div class="profile-grid">
+
+      <div class="profile-field">
+        <label>Surname</label>
+        <input class="text-input"
+               type="text"
+               id="surnameInput"
+               placeholder="e.g. Dela Cruz">
+      </div>
+
+      <div class="profile-field">
+        <label>First Name</label>
+        <input class="text-input"
+               type="text"
+               id="firstnameInput"
+               placeholder="e.g. Juan">
+      </div>
+
+      <div class="profile-field">
+        <label>Middle Name</label>
+        <input class="text-input"
+               type="text"
+               id="middlenameInput"
+               placeholder="e.g. Santos">
+      </div>
+
+
+<div class="profile-row-2">
+
+  <div class="profile-field">
+    <label>Designation</label>
+    <input class="text-input"
+           type="text"
+           id="designationInput"
+           placeholder="e.g. Teacher I">
+  </div>
+
+  <div class="profile-field">
+    <label>Principal</label>
+    <input class="text-input"
+           type="text"
+           id="principalInput"
+           placeholder="e.g. Dr. Maria Santos">
+  </div>
+
+</div>
+
+      <div class="profile-field" style="grid-column:1/-1;">
+        <label>Motto</label>
+        <input class="text-input"
+               type="text"
+               id="mottoInput"
+               placeholder="e.g. Teach with passion, lead with purpose.">
+      </div>
+
+      <div class="profile-field" style="grid-column:1/-1;">
+        <label>Short Description</label>
+
+        <textarea class="text-input"
+                  id="descriptionInput"
+                  rows="4"
+                  placeholder="e.g. Passionate educator dedicated to helping learners grow through creativity, discipline, and meaningful learning experiences."></textarea>
+      </div>
+
+    </div>
+
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary"
+              onclick="saveTeacherProfile()">
+
+        <i class="fas fa-save"></i>
+        Save Profile
+
+      </button>
+    </div>
+
+  </div>
+
+</div>
+
+
+  <!-- Theme -->
+  <div class="nickname-card">
+    <div class="stat-icon purple" aria-hidden="true"><i class="fas fa-palette"></i></div>
+    <div class="nickname-info">
+      <div class="nickname-label">Appearance</div>
+      <div class="nickname-input-wrap">
+        <button class="btn btn-ghost" onclick="openThemeSelector()" aria-label="Toggle dark mode">
+          <i class="fas fa-moon" id="themeToggleIcon" aria-hidden="true"></i>
+         <span id="themeToggleText">Change Theme</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+<div id="themePanel" class="theme-panel hidden">
+
+  <button onclick="setTheme('light')">Light</button>
+  <button onclick="setTheme('dark')">Dark</button>
+
+  <button onclick="setTheme('pink')">Pink</button>
+  <button onclick="setTheme('blue')">Blue</button>
+  <button onclick="setTheme('green')">Green</button>
+  <button onclick="setTheme('yellow')">Yellow</button>
+  <button onclick="setTheme('teal')">Teal</button>
+  <button onclick="setTheme('purple')">Purple</button>
+
+</div>
+  <!-- About -->
+  <div class="nickname-card" style="flex-direction:column;align-items:flex-start;gap:10px;">
+    <div style="font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-info-circle" style="color:var(--accent)" aria-hidden="true"></i> About TeachPlus
+    </div>
+    <div style="font-size:.82rem;color:var(--text2);line-height:1.6;">
+      TeachPlus is an offline-first teacher assistant PWA designed for real classroom use in Philippine schools. All data is stored locally on your device using IndexedDB — no internet needed after setup.
+    </div>
+    <div style="font-size:.76rem;color:var(--text3);">Version 1.0.0 · Built with Dexie.js + FontAwesome</div>
+  </div>
+
+</section><!-- /settings -->
+```
+
+  </main>
+</div><!-- /main-content -->
+
+<!-- ============================================================
+     BOTTOM NAV (mobile)
+     ============================================================ -->
+
+<nav class="bottom-nav" aria-label="Mobile navigation">
+  <div class="bottom-nav-items">
+    <button class="bottom-nav-item active" id="bnav-dashboard" onclick="showView('dashboard')" aria-label="Dashboard">
+      <i class="fas fa-th-large" aria-hidden="true"></i> Home
+    </button>
+    <button class="bottom-nav-item" id="bnav-teaching" onclick="showView('teaching')" aria-label="Teaching">
+      <i class="fas fa-book-open" aria-hidden="true"></i> Teaching
+    </button>
+    <button class="bottom-nav-item" id="bnav-forms" onclick="showView('forms')" aria-label="Forms">
+      <i class="fas fa-file-alt" aria-hidden="true"></i> Forms
+    </button>
+    <button class="bottom-nav-item" id="bnav-admin" onclick="showView('admin')" aria-label="Admin">
+      <i class="fas fa-sitemap" aria-hidden="true"></i> Admin
+    </button>
+    <button class="bottom-nav-item" id="bnav-engagement" onclick="showView('engagement')" aria-label="Engagement">
+      <i class="fas fa-star" aria-hidden="true"></i> Engage
+    </button>
+  </div>
+</nav>
+
+<!-- ============================================================
+     MODAL
+     ============================================================ -->
+
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Coming Soon</span>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close modal"><i class="fas fa-times" aria-hidden="true"></i></button>
+    </div>
+    <div id="modalBody" style="font-size:.88rem;color:var(--text2);line-height:1.6;"></div>
+    <div style="margin-top:20px;">
+      <button class="btn btn-primary" onclick="closeModal()" aria-label="Close">
+        <i class="fas fa-check" aria-hidden="true"></i> Got It
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TOAST CONTAINER
+     ============================================================ -->
+
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script src="dashboard.js"></script>
+
+</body>
+</html>
